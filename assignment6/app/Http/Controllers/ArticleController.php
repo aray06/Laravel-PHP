@@ -7,14 +7,14 @@ use Illuminate\Http\Request;
 
 class ArticleController extends Controller
 {
-    // Показывает список всех статей
+    // 1. Показ всех статей
     public function index()
     {
         $articles = Article::all();
         return view('articles.index', compact('articles'));
     }
 
-    // Сохраняет новую статью в базу
+    // 2. Создание новой статьи
     public function store(Request $request)
     {
         $request->validate([
@@ -22,17 +22,41 @@ class ArticleController extends Controller
             'content' => 'required',
         ]);
 
-        // Создаем статью через связь с текущим юзером
-        $request->user()->articles()->create($request->all());
+        auth()->user()->articles()->create($request->all());
 
         return redirect()->route('articles.index');
     }
 
-    // Добавим метод для удаления (по заданию CRUD нужен)
+    // 3. Форма редактирования (ТОЛЬКО ОДИН РАЗ!)
+    public function edit(Article $article)
+    {
+        // Проверка: править может только автор или модератор
+        if (auth()->id() !== $article->user_id && auth()->user()->role !== 'moderator') {
+            abort(403, 'У вас нет прав на редактирование этой статьи');
+        }
+        return view('articles.edit', compact('article'));
+    }
+
+    // 4. Сохранение обновлений
+    public function update(Request $request, Article $article)
+    {
+        if (auth()->id() !== $article->user_id && auth()->user()->role !== 'moderator') {
+            abort(403);
+        }
+
+        $request->validate([
+            'title' => 'required',
+            'content' => 'required',
+        ]);
+
+        $article->update($request->all());
+        return redirect()->route('articles.index');
+    }
+
+    // 5. Удаление
     public function destroy(Article $article)
     {
-        // Проверяем, что статью удаляет либо автор, либо админ
-        if (auth()->user()->id === $article->user_id || auth()->user()->role === 'admin') {
+        if (auth()->id() === $article->user_id || auth()->user()->role === 'moderator') {
             $article->delete();
         }
 
